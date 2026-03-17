@@ -1,0 +1,204 @@
+--
+-- Projet : Gestion d'un club sportif (Variante Amateur)
+-- Chargée de cours : Mme SOGNON T. Rosine
+-- Année scolaire : 2025-2026
+-- 
+
+-- Création de la base de données
+
+-- Ton script CREATE DATABASE recommence ici...
+
+USE master;
+GO
+
+-- On ferme les connexions et on supprime la base si elle existe déjà
+IF EXISTS (SELECT name FROM sys.databases WHERE name = 'GestionClubSportif')
+BEGIN
+    ALTER DATABASE GestionClubSportif SET SINGLE_USER WITH ROLLBACK IMMEDIATE;
+    DROP DATABASE GestionClubSportif;
+END
+GO
+
+-- On recrée la base toute neuve
+CREATE DATABASE GestionClubSportif;
+GO
+
+USE GestionClubSportif;
+GO
+
+
+-- Création des tables indépendantes
+CREATE TABLE SPORT (
+    IdSport INT PRIMARY KEY IDENTITY(1,1),
+    NomSport VARCHAR(50) NOT NULL -- Ex: Football, Basketball
+);
+
+CREATE TABLE ENTRAINEUR (
+    IdEntraineur INT PRIMARY KEY IDENTITY(1,1),
+    Nom VARCHAR(50) NOT NULL,
+    Prenom VARCHAR(50) NOT NULL,
+    Diplome VARCHAR(100) --
+);
+
+CREATE TABLE STADE (
+    IdStade INT PRIMARY KEY IDENTITY(1,1),
+    NomStade VARCHAR(100) NOT NULL,
+    Ville VARCHAR(50),
+    TypeSurface VARCHAR(50) --
+);
+
+CREATE TABLE COMPETITION (
+    IdCompetition INT PRIMARY KEY IDENTITY(1,1),
+    NomCompete VARCHAR(100) NOT NULL, -- Ex: Championnat District
+    Saison VARCHAR(20) NOT NULL -- Ex: 2025-2026
+);
+
+-- Création des tables avec dépendances
+CREATE TABLE EQUIPE (
+    IdEquipe INT PRIMARY KEY IDENTITY(1,1),
+    NomEquipe VARCHAR(100) NOT NULL,
+    Categorie VARCHAR(50), -- Ex: Senior, U18
+    IdSport INT NOT NULL,
+    IdEntraineur INT,
+    CONSTRAINT FK_Equipe_Sport FOREIGN KEY (IdSport) REFERENCES SPORT(IdSport),
+    CONSTRAINT FK_Equipe_Entraineur FOREIGN KEY (IdEntraineur) REFERENCES ENTRAINEUR(IdEntraineur)
+);
+
+CREATE TABLE JOUEUR (
+    IdJoueur INT PRIMARY KEY IDENTITY(1,1),
+    Nom VARCHAR(50) NOT NULL,
+    Prenom VARCHAR(50) NOT NULL,
+    DateNaissance DATE,
+    Adresse VARCHAR(255),
+    IdEquipe INT, --
+    CONSTRAINT FK_Joueur_Equipe FOREIGN KEY (IdEquipe) REFERENCES EQUIPE(IdEquipe)
+);
+
+CREATE TABLE LICENCE (
+    NumLicence VARCHAR(20) PRIMARY KEY, -- Identifiant unique de licence
+    DateEmission DATE NOT NULL,
+    Prix DECIMAL(10,2),
+    StatutPaiement VARCHAR(20) DEFAULT 'A jour',
+    IdJoueur INT NOT NULL,
+    CONSTRAINT FK_Licence_Joueur FOREIGN KEY (IdJoueur) REFERENCES JOUEUR(IdJoueur)
+);
+
+-- Gestion des Matchs et des contraintes métier
+CREATE TABLE MATCH (
+    IdMatch INT PRIMARY KEY IDENTITY(1,1),
+    DateMatch DATE NOT NULL,
+    HeureMatch TIME NOT NULL,
+    IdStade INT NOT NULL,
+    IdCompetition INT NOT NULL,
+    IdEquipeDom INT NOT NULL,
+    IdEquipeExt INT NOT NULL,
+    
+    -- Contrainte : Une équipe ne peut pas jouer contre elle-même
+    CONSTRAINT CHK_Equipes_Differentes CHECK (IdEquipeDom <> IdEquipeExt),
+    
+    CONSTRAINT FK_Match_Stade FOREIGN KEY (IdStade) REFERENCES STADE(IdStade),
+    CONSTRAINT FK_Match_Compete FOREIGN KEY (IdCompetition) REFERENCES COMPETITION(IdCompetition),
+    CONSTRAINT FK_Match_Dom FOREIGN KEY (IdEquipeDom) REFERENCES EQUIPE(IdEquipe),
+    CONSTRAINT FK_Match_Ext FOREIGN KEY (IdEquipeExt) REFERENCES EQUIPE(IdEquipe)
+);
+
+-- Application de la contrainte métier : "Une équipe ne peut jouer qu'un match programmé"
+-- Note : On utilise des index uniques pour empêcher qu'une équipe (dom ou ext) soit prise sur le même créneau.
+CREATE UNIQUE INDEX UNQ_EquipeDom_Planning ON MATCH (IdEquipeDom, DateMatch, HeureMatch);
+CREATE UNIQUE INDEX UNQ_EquipeExt_Planning ON MATCH (IdEquipeExt, DateMatch, HeureMatch);
+
+-- Gestion des Scores (Entité principale distincte)
+CREATE TABLE SCORE (
+    IdScore INT PRIMARY KEY IDENTITY(1,1),
+    PointsDomicile INT DEFAULT 0,
+    PointsExterieur INT DEFAULT 0,
+    IdMatch INT UNIQUE NOT NULL, --
+    CONSTRAINT FK_Score_Match FOREIGN KEY (IdMatch) REFERENCES MATCH(IdMatch)
+);
+
+
+-- Jeu de données simple
+
+USE GestionClubSportif;
+GO
+
+-- Sports et Entraîneurs
+INSERT INTO SPORT (NomSport) VALUES ('Football'), ('Basketball');
+INSERT INTO ENTRAINEUR (Nom, Prenom, Diplome) 
+VALUES ('Zidane', 'Zinedine', 'UEFA Pro'), 
+       ('Parker', 'Tony', 'BEES 2'),
+       ('Koffi', 'Fodo', 'CAF');
+
+-- Équipes (Liées aux sports et entraîneurs)
+INSERT INTO EQUIPE (NomEquipe, Categorie, IdSport, IdEntraineur) 
+VALUES ('Epervier', 'Senior', 1, 1), 
+       ('AS_Togo', 'Senior', 1, 1),
+       ('ASCK', 'U18', 2, 2);
+
+-- Joueurs et Licences
+INSERT INTO JOUEUR (Nom, Prenom, DateNaissance, Adresse, IdEquipe)
+VALUES ('Kevin', 'Kossi', '2000-05-15', 'Rue des Stars, Lomé', 1),
+       ('Smith', 'Kokou', '1998-11-20', 'Colombe de la Paix, Lomé', 2),
+       ('Louis', 'Sainte', '2004-11-20', 'Agoe, Lomé', 3),
+       ('Roi', 'Rois', '2003-11-20', 'Zogo, Lomé', 3);
+
+
+
+INSERT INTO LICENCE (NumLicence, DateEmission, Prix, StatutPaiement, IdJoueur)
+VALUES ('LIC2026001', '2026-01-10', 5000.00, 'A jour', 1),
+       ('LIC2026002', '2026-01-12', 5000.00, 'En attente', 2),
+       ('LIC2026003', '2026-01-12', 4500.00, 'En attente', 3),
+       ('LIC2026004', '2026-01-15', 4500.00, 'A jour', 4);
+
+-- Compétitions et Stades
+INSERT INTO COMPETITION (NomCompete, Saison) VALUES ('Championnat D1 Lonato', '2025-2026'),('Championnat Feminin','2025-2026');
+INSERT INTO STADE (NomStade, Ville, TypeSurface) VALUES ('Stade de Kegué', 'Lomé', 'Gazon'),('Stade Omnisport', 'Lomé', 'Synthétique');
+
+-- Matchs (Conflit d'horaire évité grâce à tes index uniques !)
+INSERT INTO MATCH (DateMatch, HeureMatch, IdStade, IdCompetition, IdEquipeDom, IdEquipeExt)
+VALUES ('2026-03-15', '15:00:00', 1, 1, 1, 2),
+('2026-04-09', '17:30:00', 1,2,2,3);
+
+
+
+-- Scores (L'entité obligatoire de ton sujet)
+INSERT INTO SCORE (PointsDomicile, PointsExterieur, IdMatch) VALUES (2, 1, 1),(3, 0, 2);
+
+-- Pratique de quelques requêtes pour répondre aux besoins de gestion du club:
+
+-- Exemple de Planning des Rencontres
+
+SELECT 
+    M.DateMatch, 
+    M.HeureMatch, 
+    E1.NomEquipe AS Domicile, 
+    E2.NomEquipe AS Exterieur, 
+    S.NomStade
+FROM MATCH M
+JOIN EQUIPE E1 ON M.IdEquipeDom = E1.IdEquipe
+JOIN EQUIPE E2 ON M.IdEquipeExt = E2.IdEquipe
+JOIN STADE S ON M.IdStade = S.IdStade;
+
+-- Statistiques des Joueurs et Licences
+SELECT 
+    J.Nom, 
+    J.Prenom, 
+    E.NomEquipe, 
+    L.NumLicence, 
+    L.StatutPaiement
+FROM JOUEUR J
+JOIN EQUIPE E ON J.IdEquipe = E.IdEquipe
+LEFT JOIN LICENCE L ON J.IdJoueur = L.IdJoueur;
+
+-- Le Classement (Résultats des Matchs)
+
+SELECT 
+    M.DateMatch,
+    E1.NomEquipe AS Equipe_Dom,
+    S.PointsDomicile,
+    S.PointsExterieur,
+    E2.NomEquipe AS Equipe_Ext
+FROM SCORE S
+JOIN MATCH M ON S.IdMatch = M.IdMatch
+JOIN EQUIPE E1 ON M.IdEquipeDom = E1.IdEquipe
+JOIN EQUIPE E2 ON M.IdEquipeExt = E2.IdEquipe;
