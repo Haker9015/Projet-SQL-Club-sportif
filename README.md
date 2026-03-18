@@ -13,7 +13,7 @@ PRÉSENTÉ PAR :
 
 Année scolaire : 2025-2026  
 
-# Cours Bases de Données (Mme SOGNON T. Rosine)
+# Cours de Bases de Données (Mme SOGNON T. Rosine)
 
 ## Description
 Ce projet contient la modélisation complète et l'implémentation SQL Server d'un système de gestion pour un club sportif local.
